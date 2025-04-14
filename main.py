@@ -1,16 +1,18 @@
-from typing import Annotated
-from fastapi import FastAPI, HTTPException
-from pydantic import AfterValidator, BaseModel
+from typing import Annotated, List
+from fastapi import Body, Cookie, FastAPI, HTTPException
+from pydantic import AfterValidator, BaseModel, Field
 
 app = FastAPI()
 
 class Item(BaseModel):
     text: str
     is_done: bool = False
+    price: float = Field(gt=0, description="The price must be greater then zero")
+    tags: List[str]
     
 def check_text(item: Item):
     if len(item.text) < 5:
-        raise ValueError(f'Text is to short: {item.text.count()}')
+        raise ValueError(f'Text is to short: {len(item.text)}')
     return item
 
 items = []
@@ -19,10 +21,12 @@ items = []
 async def root():
     return items
 
-@app.post("/items")
-def create_item(item: Annotated[Item, AfterValidator(check_text)]):
+@app.post("/items", status_code=201)
+def create_item(test: Annotated[str | None, Cookie()], item: Annotated[Item, AfterValidator(check_text), Body(example=[{
+    "text": "test doc"
+}])]):
     items.append(item)
-    return items
+    return {"test": test, **item.model_dump()}
 
 @app.put("/items/{item_id}")
 async def update_item(item_id: int, item: Item):
