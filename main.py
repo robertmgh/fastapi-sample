@@ -1,8 +1,20 @@
 from typing import Annotated, List
-from fastapi import Body, Cookie, FastAPI, HTTPException
+from fastapi import Body, Cookie, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import AfterValidator, BaseModel, Field
 
+class ValidationCustomException(Exception):
+    def __init__(self, name: str):
+        self.name = name
+
 app = FastAPI()
+
+@app.exception_handler(ValidationCustomException)
+async def test_exception_handler(request: Request, exc: ValidationCustomException):
+    return JSONResponse(
+        status_code=400,
+        content={"message": f"Validation error: {exc.name}"}
+    )
 
 class Item(BaseModel):
     text: str
@@ -25,6 +37,8 @@ async def root():
 def create_item(test: Annotated[str | None, Cookie()], item: Annotated[Item, AfterValidator(check_text), Body(example=[{
     "text": "test doc"
 }])]):
+    if item.is_done == False:
+        raise ValidationCustomException("Item is not done")
     items.append(item)
     return {"test": test, **item.model_dump()}
 
